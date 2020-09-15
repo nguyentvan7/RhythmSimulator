@@ -9,6 +9,9 @@ import os
 import csv
 from os import path
 
+def s(x0):
+    return int(float(x0))
+
 def main():
     # Parse command line arguments.
     input_folder_name = ""
@@ -85,7 +88,8 @@ def main():
             input_regions = [[0.0, height, width, 0.0, 1 , 1]]
         else:
             # Read region file.
-            input_regions = list(csv.reader(open(regions), delimiter=','))
+            # Sort by x0.
+            input_regions = sorted(list(csv.reader(open(regions), delimiter=',')), key=lambda region:int(float(region[0])))
 
         # Iterate over input image.
         for row in range(height):
@@ -97,6 +101,9 @@ def main():
                     x0 = int(float(region[0]))
                     y0 = height-int(float(region[1]))
                     x1 = int(float(region[2]))
+                    # Minor optimization.
+                    if col*2 < x0:
+                        break
                     y1 = height-int(float(region[3]))
                     stride = int(region[4])
                     skip = int(region[5])-1
