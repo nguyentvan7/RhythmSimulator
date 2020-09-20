@@ -74,12 +74,18 @@ def main():
     imageregionlist.reverse()
     # Used for rate.
     prev_image = None
-    bitmask = []
+    bitmasks = collections.deque(maxlen=4)
+    encoded_images = collections.deque(maxlen=4)
+    row_offsets = collections.deque(maxlen=4)
     images = 0
+    zero_p = np.zeros(3, np.uint8)
     
     # Iterate over all images.
     for image, regions in imageregionlist:
         pixels = 0
+        bitmask = []
+        encoded_pixels = []
+        row_offset = []
         input_image = cv2.imread(image)
         height, width, channels = input_image.shape
         output_image = np.zeros((height, width, channels), np.uint8)
@@ -93,6 +99,8 @@ def main():
 
         # Iterate over input image.
         for row in range(height):
+            rowmask = []
+            row_offset.append(pixels)
             for col in range(width//2):
                 pixelmask = 0b11
                 # Iterate over regions.
@@ -122,39 +130,51 @@ def main():
                                 pixelmask = 0b10
                         if pixelmask == 0b00:
                             pixels += 2
+                            encoded_pixels.append(input_image[row, col*2])
+                            encoded_pixels.append(input_image[row, col*2+1])
                             break
-                bitmask.append(pixelmask)
+                rowmask.append(pixelmask)
+            bitmask.append(rowmask)
+        bitmasks.appendleft(bitmask)
+        row_offsets.appendleft(row_offset)
+        
+        # Fill last row.
+        while (pixels) % width != 0:
+            encoded_pixels.append(zero_p)
+            encoded_pixels.append(zero_p)
+            pixels += 2
 
-        # Generate encoded image and output image together.
-        encoded_height = -(-pixels // width)
-        encoded_image = np.zeros((encoded_height, width, channels), np.uint8)
-        encoded_px = 0
+        # Convert list to image.
+        #print(encoded_pixels, pixels, width, channels)
+        encoded_image = np.reshape(np.array(encoded_pixels, dtype=np.uint8), (-(-pixels//width), width, channels))
+        encoded_images.appendleft(encoded_image)
+
+        # Decode image.
         for row in range(height):
             for col in range(width//2):
-                pixelmask = bitmask.pop(0)
-                if pixelmask == 0b00:
-                    # Regional pixel, copy to encoded and output image.
-                    encoded_image[encoded_px // width, encoded_px % width] = input_image[row, col*2]
-                    output_image[row, col*2] = encoded_image[encoded_px // width, encoded_px % width]
-                    encoded_px += 1
-                    encoded_image[encoded_px // width, encoded_px % width] = input_image[row, col*2+1]
-                    output_image[row, col*2+1] = encoded_image[encoded_px // width, encoded_px % width]
-                    encoded_px += 1
-                elif pixelmask == 0b10:
-                    # Stride, copy from left encoded px.
-                    output_image[row, col*2] = encoded_image[(encoded_px-2) // width, (encoded_px-2) % width]
-                    output_image[row, col*2+1] = encoded_image[(encoded_px-1) // width, (encoded_px-1) % width]
-                elif pixelmask == 0b01:
-                    # Skip, copy from previous frame.
-                    output_image[row, col*2] = prev_image[row, col*2]
-                    output_image[row, col*2+1] = prev_image[row, col*2+1]
-                else:
-                    # No pixel, black.
+                pixelmask = bitmask[row][col]
+                if pixelmask == 0b01:
+                    # Skip, check previous frames, most recent first, but skipping current.
+                    for frame in range(1, len(encoded_images)):
+                        if bitmasks[frame][row][col] == 0b00 or bitmasks[frame][row][col]:
+                            r, c = get_px_index(encoded_images[frame], bitmasks[frame][row], row_offsets[frame][row], col)
+                            output_image[row, col*2] = encoded_images[frame][r][c]
+                            output_image[row, col*2+1] = encoded_images[frame][r][c+1]
+                            break
+                elif pixelmask == 0b00 or pixelmask == 0b10:
+                    # Regional or strided pixel.
+                    r, c = get_px_index(encoded_image, bitmask[row], row_offset[row], col)
+                    output_image[row, col*2] = encoded_image[r][c]
+                    try:
+                        output_image[row, col*2+1] = encoded_image[r][c+1]
+                    except IndexError:
+                        print(row, col, r, c)
+                elif pixelmask == 0b11:
+                    # Non-regional, make a black pixel.
                     output_image[row, col*2] = 0
                     output_image[row, col*2+1] = 0
-        
-        prev_image = output_image
-
+                            
+                        
         # Save image
         output_name = image.split('/')[1]
         cv2.imwrite(output_folder_name + '/' + output_name, output_image)
@@ -163,7 +183,21 @@ def main():
         print(int(images/filecount*100), "% done (", images, "/", filecount, ")", sep="")
 
     print("Completed in ", datetime.now()-start, "! Check ./", output_folder_name, " for decoded and encoded frames.", sep="")
-    exit(1)
+    return
+
+def get_px_index(encoded_image, rowmask, row_offset, col):
+    count = 0
+    for i in range(col):
+        if rowmask[i] == 0b00:
+            # Regional pixel.
+            count += 2
+
+    encoded_height, width, channels = encoded_image.shape
+    regional_px_cnt = row_offset + count
+    row = regional_px_cnt // width
+    col = regional_px_cnt % width
+
+    return row, col
                 
 def print_usage():
     print("""\

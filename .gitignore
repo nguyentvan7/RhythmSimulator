@@ -1,0 +1,4 @@
+input/
+csv/
+__pycache__/
+output/
