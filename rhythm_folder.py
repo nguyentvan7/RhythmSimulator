@@ -105,6 +105,9 @@ def main():
             # Read region file.
             # Sort by x0.
             input_regions = sorted(list(csv.reader(open(regions), delimiter=',')), key=lambda region:int(float(region[0])))
+            # Check if file is empty
+            if not input_regions:
+                input_regions = [[0.0, height, width, 0.0, 1 , 1]]
 
         # Iterate over input image.
         for row in range(height):
@@ -146,7 +149,7 @@ def main():
             bitmask.append(rowmask)
         bitmasks.appendleft(bitmask)
         row_offsets.appendleft(row_offset)
-        
+        print(datetime.now()-start)
         # Fill last row.
         while (pixels) % width != 0:
             encoded_pixels.append(zero_p)
