@@ -55,6 +55,8 @@ def main():
         print("Created output folder.")
     if not path.exists(output_folder_name + "/encoded"):
         os.mkdir(output_folder_name + "/encoded")
+    if not path.exists(output_folder_name + "/stats"):
+        os.mkdir(output_folder_name + "/stats")
     # Check region folder.
     if not path.exists(region_folder_name):
         print("Region folder does not exist.")
@@ -79,9 +81,16 @@ def main():
     row_offsets = collections.deque(maxlen=4)
     images = 0
     zero_p = np.zeros(3, np.uint8)
+    total_pixel_touches = 0
+    total_bitmask_touches = 0
+    total_row_offset_touches = 0
+    total_bits = 0
     
     # Iterate over all images.
     for image, regions in imageregionlist:
+        pixel_touches = 0
+        bitmask_touches = 0
+        row_offset_touches = 0
         pixels = 0
         bitmask = []
         encoded_pixels = []
@@ -145,7 +154,9 @@ def main():
             pixels += 2
 
         # Convert list to image.
-        #print(encoded_pixels, pixels, width, channels)
+        pixel_touches += pixels
+        bitmask_touches += pixels/2
+        row_offset_touches += height
         encoded_image = np.reshape(np.array(encoded_pixels, dtype=np.uint8), (-(-pixels//width), width, channels))
         encoded_images.appendleft(encoded_image)
 
@@ -153,26 +164,32 @@ def main():
         for row in range(height):
             for col in range(width//2):
                 pixelmask = bitmask[row][col]
+                bitmask_touches += 1
                 if pixelmask == 0b01:
                     # Skip, check previous frames, most recent first, but skipping current.
                     for frame in range(1, len(encoded_images)):
-                        if bitmasks[frame][row][col] == 0b00 or bitmasks[frame][row][col]:
-                            r, c = get_px_index(encoded_images[frame], bitmasks[frame][row], row_offsets[frame][row], col)
+                        if bitmasks[frame][row][col] == 0b00 or bitmasks[frame][row][col] == 0b10:
+                            bitmask_touches += 1
+                            r, c, count = get_px_index(encoded_images[frame], bitmasks[frame][row], row_offsets[frame][row], col)
                             output_image[row, col*2] = encoded_images[frame][r][c]
                             output_image[row, col*2+1] = encoded_images[frame][r][c+1]
+                            pixel_touches += 4
+                            bitmask_touches += count
+                            row_offset_touches += 1
                             break
                 elif pixelmask == 0b00 or pixelmask == 0b10:
                     # Regional or strided pixel.
-                    r, c = get_px_index(encoded_image, bitmask[row], row_offset[row], col)
+                    r, c, count = get_px_index(encoded_image, bitmask[row], row_offset[row], col)
                     output_image[row, col*2] = encoded_image[r][c]
-                    try:
-                        output_image[row, col*2+1] = encoded_image[r][c+1]
-                    except IndexError:
-                        print(row, col, r, c)
+                    output_image[row, col*2+1] = encoded_image[r][c+1]
+                    pixel_touches += 4
+                    bitmask_touches += count
+                    row_offset_touches += 1
                 elif pixelmask == 0b11:
                     # Non-regional, make a black pixel.
                     output_image[row, col*2] = 0
                     output_image[row, col*2+1] = 0
+                    pixel_touches += 2
                             
                         
         # Save image
@@ -181,7 +198,23 @@ def main():
         cv2.imwrite(output_folder_name + '/encoded/' + output_name, encoded_image)
         images += 1
         print(int(images/filecount*100), "% done (", images, "/", filecount, ")", sep="")
+        # Stat calculation
+        current_bits = pixel_touches*24 + bitmask_touches*2 + row_offset_touches*24
+        print(round(current_bits/8000000, 2), "MB estimated with", format(pixel_touches, ","), "pixel touches,", format(int(bitmask_touches), ","), "bitmask touches, and", format(row_offset_touches, ","), "row offset touches for this image.")
+        with open(output_folder_name + '/stats/' + output_name + '.csv', 'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow((round(current_bits/8000000, 2), pixel_touches, int(bitmask_touches), row_offset_touches))
+        # Total stat calculation
+        total_bits += current_bits
+        total_pixel_touches += pixel_touches
+        total_bitmask_touches += bitmask_touches
+        total_row_offset_touches += row_offset_touches
+        print(round(total_bits/8000000, 2), "MB estimated with", format(total_pixel_touches, ","), "pixel touches,", format(int(total_bitmask_touches), ","), "bitmask touches, and", format(total_row_offset_touches, ","), "row offset touches in total.")
+        print()
 
+    with open(output_folder_name + '/stats/total.csv', 'w') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow((round(total_bits/8000000, 2), total_pixel_touches, int(total_bitmask_touches), total_row_offset_touches))
     print("Completed in ", datetime.now()-start, "! Check ./", output_folder_name, " for decoded and encoded frames.", sep="")
     return
 
@@ -197,7 +230,7 @@ def get_px_index(encoded_image, rowmask, row_offset, col):
     row = regional_px_cnt // width
     col = regional_px_cnt % width
 
-    return row, col
+    return row, col, count
                 
 def print_usage():
     print("""\
