@@ -173,7 +173,7 @@ def main():
                             r, c, count = get_px_index(encoded_images[frame], bitmasks[frame][row], row_offsets[frame][row], col)
                             output_image[row, col*2] = encoded_images[frame][r][c]
                             output_image[row, col*2+1] = encoded_images[frame][r][c+1]
-                            pixel_touches += 4
+                            pixel_touches += 2
                             bitmask_touches += count
                             row_offset_touches += 1
                             break
@@ -182,14 +182,13 @@ def main():
                     r, c, count = get_px_index(encoded_image, bitmask[row], row_offset[row], col)
                     output_image[row, col*2] = encoded_image[r][c]
                     output_image[row, col*2+1] = encoded_image[r][c+1]
-                    pixel_touches += 4
+                    pixel_touches += 2
                     bitmask_touches += count
                     row_offset_touches += 1
                 elif pixelmask == 0b11:
                     # Non-regional, make a black pixel.
                     output_image[row, col*2] = 0
                     output_image[row, col*2+1] = 0
-                    pixel_touches += 2
                             
                         
         # Save image
@@ -230,7 +229,7 @@ def get_px_index(encoded_image, rowmask, row_offset, col):
     row = regional_px_cnt // width
     col = regional_px_cnt % width
 
-    return row, col, count
+    return row, col, count//2
                 
 def print_usage():
     print("""\
