@@ -292,19 +292,19 @@ int main(int argc, char *argv[]) {
 		
 		// Write to csv.
 		std::ofstream csvfile(output_folder_name + "/stats/" + output_stats_name);
-		csvfile << write_current_bits/MEGABYTE;
-		csvfile << write_pixel_touches;
-		csvfile << write_bitmask_touches;
+		csvfile << write_current_bits/MEGABYTE << ", ";
+		csvfile << write_pixel_touches << ", ";
+		csvfile << write_bitmask_touches << ", ";
 		csvfile << write_row_offset_touches;
 		csvfile << std::endl;
-		csvfile << read_current_bits/MEGABYTE;
-		csvfile << read_pixel_touches;
-		csvfile << read_bitmask_touches;
+		csvfile << read_current_bits/MEGABYTE << ", ";
+		csvfile << read_pixel_touches << ", ";
+		csvfile << read_bitmask_touches << ", ";
 		csvfile << read_row_offset_touches;
 		csvfile << std::endl;
-		csvfile << (read_current_bits+write_current_bits)/MEGABYTE;
-		csvfile << read_pixel_touches+write_pixel_touches;
-		csvfile << read_bitmask_touches+write_bitmask_touches;
+		csvfile << (read_current_bits+write_current_bits)/MEGABYTE << ", ";
+		csvfile << read_pixel_touches+write_pixel_touches << ", ";
+		csvfile << read_bitmask_touches+write_bitmask_touches << ", ";
 		csvfile << read_row_offset_touches+write_row_offset_touches;
 		csvfile.close();
 		
@@ -322,19 +322,19 @@ int main(int argc, char *argv[]) {
 	
 	// Write total statistics.
 	std::ofstream csvfile(output_folder_name + "/stats/total.csv");
-	csvfile << total_write_bits/MEGABYTE;
-	csvfile << total_write_pixel_touches;
-	csvfile << total_write_bitmask_touches;
+	csvfile << total_write_bits/MEGABYTE << ", ";
+	csvfile << total_write_pixel_touches << ", ";
+	csvfile << total_write_bitmask_touches << ", ";
 	csvfile << total_write_row_offset_touches;
 	csvfile << std::endl;
-	csvfile << total_read_bits/MEGABYTE;
-	csvfile << total_read_pixel_touches;
-	csvfile << total_read_bitmask_touches;
+	csvfile << total_read_bits/MEGABYTE << ", ";
+	csvfile << total_read_pixel_touches << ", ";
+	csvfile << total_read_bitmask_touches << ", ";
 	csvfile << total_read_row_offset_touches;
 	csvfile << std::endl;
-	csvfile << (total_read_bits+total_write_bits)/MEGABYTE;
-	csvfile << total_read_pixel_touches+total_write_pixel_touches;
-	csvfile << total_read_bitmask_touches+total_write_bitmask_touches;
+	csvfile << (total_read_bits+total_write_bits)/MEGABYTE << ", ";
+	csvfile << total_read_pixel_touches+total_write_pixel_touches << ", ";
+	csvfile << total_read_bitmask_touches+total_write_bitmask_touches << ", ";
 	csvfile << total_read_row_offset_touches+total_write_row_offset_touches;
 	csvfile.close();
 
