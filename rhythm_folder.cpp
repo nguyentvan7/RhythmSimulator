@@ -26,6 +26,7 @@ void print_usage();
 std::tuple <int, int> get_px_index(uint32_t width, std::vector<uint8_t> rowmask, uint32_t row_offset, uint col);
 
 bool region_sort(region a, region b) { return a.x0 < b.x0; }
+bool file_sort(std::string a, std::string b) { return a.size() < b.size() || (a.size() == b.size() && a < b); }
 
 int main(int argc, char *argv[]) {
 	// Argument handling.
@@ -98,8 +99,8 @@ int main(int argc, char *argv[]) {
 	for (auto& p: fs::directory_iterator(region_folder_name)) {
 		regionlist.push_back(p.path());
 	}
-	std::sort(imagelist.begin(), imagelist.end());
-	std::sort(regionlist.begin(), regionlist.end());
+	std::sort(imagelist.begin(), imagelist.end(), file_sort);
+	std::sort(regionlist.begin(), regionlist.end(), file_sort);
 
 	// Storing previous data.
 	std::vector<std::vector<std::vector<uint8_t>>> bitmasks;
@@ -341,7 +342,7 @@ int main(int argc, char *argv[]) {
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
 	std::cout << "==================================" << std::endl;
-	std::cout << std::setprecision(2) << total_write_bits/MEGABYTE << " MB estimated written with " << total_write_pixel_touches << " pixel touches, " << total_write_bitmask_touches << " bitmask touches, and " << total_write_row_offset_touches << " row offset touches in total." << std::endl << std::endl;
+	std::cout << std::setprecision(2) << total_write_bits/MEGABYTE << " MB estimated written with " << total_write_pixel_touches << " pixel touches, " << total_write_bitmask_touches << " bitmask touches, and " << total_write_row_offset_touches << " row offset touches in total." << std::endl;
 	std::cout << std::setprecision(2) << total_read_bits/MEGABYTE << " MB estimated read with " << total_read_pixel_touches << " pixel touches, " << total_read_bitmask_touches << " bitmask touches, and " << total_read_row_offset_touches << " row offset touches in total." << std::endl;
 	std::cout << "Completed in " << duration.count() << " seconds! Check ./" << output_folder_name << " for decoded/encoded frames and statistics";
 	return 0;
