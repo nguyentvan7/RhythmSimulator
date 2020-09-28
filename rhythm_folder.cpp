@@ -8,6 +8,7 @@
 #include <experimental/filesystem>
 #include <locale>
 #include <chrono>
+#include <fmt/format.h>
 
 #define MEGABYTE 8000000.0
 typedef cv::Point3_<uint8_t> Pixel;
@@ -33,6 +34,7 @@ int main(int argc, char *argv[]) {
 	std::string input_folder_name;
 	std::string output_folder_name;
 	std::string region_folder_name;
+	std::string t;
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
 			print_usage();
@@ -78,6 +80,9 @@ int main(int argc, char *argv[]) {
 	if (!fs::exists(output_folder_name + "/stats")) {
 		fs::create_directory(output_folder_name + "/stats");
 	}
+	if (!fs::exists(output_folder_name + "/traces")) {
+		fs::create_directory(output_folder_name + "/traces");
+	}
 	// Check region folder.
 	if (!fs::exists(region_folder_name)) {
 		std::cout << "Region folder does not exist.";
@@ -118,6 +123,22 @@ int main(int argc, char *argv[]) {
 	uint64_t total_read_bits = 0;
 	int images = 0;
 
+	// For trace.
+	cv::Mat m = cv::imread(imagelist[0]);
+	int h = m.rows;
+	int w = m.cols;
+	std::ofstream trace;
+	trace.open(output_folder_name + "/traces/full.txt");
+	const uint8_t PX_BITS = 24;
+	uint32_t BASE = 0x30000000;
+	const uint32_t FRAMES[4] = {BASE, BASE + h*w*PX_BITS, BASE + h*w*PX_BITS*2, BASE + h*w*PX_BITS*3};
+	BASE = 0x60000000;
+	const uint32_t BITMASKS[4] = {BASE, BASE + h*w*2, BASE + h*w*2*2, BASE + h*w*2*3};
+	BASE = 0x6A000000;
+	const uint32_t ROW_OFFSETS[4] = {BASE, BASE + h*24, BASE + h*24*2, BASE + h*24*3};
+	const std::string WRITE = "{:#x} w\n";
+	const std::string READ = "{:#x} r\n";
+	
 	std::cout << "Starting processing on " << filecount << " frames." << std::endl;
 	auto start = std::chrono::high_resolution_clock::now();
 	
@@ -145,6 +166,11 @@ int main(int argc, char *argv[]) {
 		std::ifstream region_file(region_path);
 		std::vector<region> regions;
 		std::string line;
+		
+		// Open trace file.
+		std::string trace_path = output_folder_name + "/traces/" + region_path.substr(region_folder_name.length()+1, region_path.find(".csv")-4) + ".txt";
+		std::ofstream single_trace;
+		single_trace.open(trace_path);
 		// Iterate over all regions.
 		while (std::getline(region_file, line)) {
 			std::stringstream ss(line);
@@ -176,6 +202,9 @@ int main(int argc, char *argv[]) {
 			std::vector<uint8_t> rowmask;
 			row_offset.push_back(write_pixel_touches);
 			write_row_offset_touches++;
+			t = fmt::format(WRITE, ROW_OFFSETS[file%4] + row*24);
+			trace << t;
+			single_trace << t;
 			for (int col = 0; col < width/2; col++) {
 				uint8_t pixelmask = 0b11;
 				for (int reg = 0; reg < regions.size(); reg++) {
@@ -205,6 +234,9 @@ int main(int argc, char *argv[]) {
 						}
 						// 0b00 indicates regional pixel, exit loop now.
 						if (pixelmask == 0b00) {
+							t = fmt::format(WRITE, FRAMES[file%4] + (write_pixel_touches % width)*(write_pixel_touches / width)*PX_BITS);
+							trace << t;
+							single_trace << t;
 							write_pixel_touches += 2;
 							encoded_pixels.push_back(input_image.at<Pixel>(row, col*2));
 							encoded_pixels.push_back(input_image.at<Pixel>(row, col*2+1));
@@ -214,6 +246,9 @@ int main(int argc, char *argv[]) {
 				} // Region loop
 				rowmask.push_back(pixelmask);
 				write_bitmask_touches++;
+				t = fmt::format(WRITE, BITMASKS[file%4] + row*col*2);
+				trace << t;
+				single_trace << t;
 			} // Col loop
 			bitmask.push_back(rowmask);
 		} // Row loop
@@ -223,6 +258,9 @@ int main(int argc, char *argv[]) {
 			encoded_pixels.push_back(zero);
 			encoded_pixels.push_back(zero);
 			write_pixel_touches += 2;
+			t = fmt::format(WRITE, FRAMES[file%4] + (write_pixel_touches % width)*(write_pixel_touches / width)*PX_BITS);
+			trace << t;
+			single_trace << t;
 		}
 
 		// Convert vector to image.
@@ -241,8 +279,41 @@ int main(int argc, char *argv[]) {
 		for (int row = 0; row < height; row++) {
 			// Assume we cache row_offset for each of the frames at each row.
 			read_row_offset_touches += row_offsets.size();
+			const int b = row*24;
+			t = fmt::format(READ, ROW_OFFSETS[file%4] + b); 
+			trace << t;
+			single_trace << t;
+			t = fmt::format(READ, ROW_OFFSETS[(file+1)%4] + b); 
+			trace << t;
+			single_trace << t;
+			t = fmt::format(READ, ROW_OFFSETS[(file+2)%4] + b); 
+			trace << t;
+			single_trace << t;
+			t = fmt::format(READ, ROW_OFFSETS[(file+3)%4] + b); 
+			trace << t;
+			single_trace << t;
 			// Assume we cache the bitmask for the entire row for each of the 4 frames at each row.
 			read_bitmask_touches += bitmasks.size()*width/2;
+			// Need to do this 4 times so that the bitmask is read as a row in order per frame.
+			std::string b0;
+			std::string b1;
+			std::string b2;
+			std::string b3;
+			for (int col = 0; col < width/2; col++) {
+				// Do trace in here because we read the entire row.
+				b0 += fmt::format(READ, BITMASKS[file%4] + row*col*2);
+				b1 += fmt::format(READ, BITMASKS[(file+1)%4] + row*col*2);
+				b2 += fmt::format(READ, BITMASKS[(file+2)%4] + row*col*2);
+				b3 += fmt::format(READ, BITMASKS[(file+3)%4] + row*col*2);
+			}
+			trace << b0;
+			single_trace << b0;
+			trace << b1;
+			single_trace << b1;
+			trace << b2;
+			single_trace << b2;
+			trace << b3;
+			single_trace << b3;
 			for (int col = 0; col < width/2; col++) {
 				uint8_t pixelmask = bitmask[row][col];
 				if (pixelmask == 0b01) {
@@ -255,6 +326,9 @@ int main(int argc, char *argv[]) {
 							output_image.at<Pixel>(row, col*2) = encoded_images[fr].at<Pixel>(r, c);
 							output_image.at<Pixel>(row, col*2+1) = encoded_images[fr].at<Pixel>(r, c+1);
 							read_pixel_touches += 2;
+							t = fmt::format(READ, FRAMES[(file+fr)%4] + r*c*PX_BITS);
+							trace << t;
+							single_trace << t;
 							// Only want to grab pixels once.
 							break;
 						}
@@ -268,6 +342,9 @@ int main(int argc, char *argv[]) {
 					output_image.at<Pixel>(row, col*2) = encoded_image.at<Pixel>(r, c);
 					output_image.at<Pixel>(row, col*2+1) = encoded_image.at<Pixel>(r, c+1);
 					read_pixel_touches += 2;
+					t = fmt::format(READ, FRAMES[file%4] + r*c*PX_BITS);
+					trace << t;
+					single_trace << t;
 				}
 				else if (pixelmask == 0b11) {
 					output_image.at<Pixel>(row, col*2) = zero;
@@ -276,6 +353,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
+		single_trace.close();
 		// Save images.
 		std::string output_image_name = image_path.substr(input_folder_name.length()+1, image_path.length()-input_folder_name.length()-1);
 		std::string output_stats_name = region_path.substr(region_folder_name.length()+1, region_path.length()-region_folder_name.length()-1);
@@ -285,8 +363,8 @@ int main(int argc, char *argv[]) {
 		std::cout << "======= " << (int)images/filecount*100 << "% done (" << images << "/" << filecount << ") =======" << std::endl;
 		
 		// Calculate statistics.
-		uint32_t write_current_bits = write_pixel_touches*24 + write_bitmask_touches*2 + write_row_offset_touches*24;
-		uint32_t read_current_bits = read_pixel_touches*24 + read_bitmask_touches*2 + read_row_offset_touches*24;
+		uint32_t write_current_bits = write_pixel_touches*PX_BITS + write_bitmask_touches*2 + write_row_offset_touches*PX_BITS;
+		uint32_t read_current_bits = read_pixel_touches*PX_BITS + read_bitmask_touches*2 + read_row_offset_touches*PX_BITS;
 		std::cout.imbue(std::locale(""));
 		std::cout << std::setprecision(2) << write_current_bits/MEGABYTE << " MB estimated written with " << write_pixel_touches << " pixel touches, " << write_bitmask_touches << " bitmask touches, and " << write_row_offset_touches << " row offset touches for this frame." << std::endl;
 		std::cout << std::setprecision(2) << read_current_bits/MEGABYTE << " MB estimated read with " << read_pixel_touches << " pixel touches, " << read_bitmask_touches << " bitmask touches, and " << read_row_offset_touches << " row offset touches for this frame." << std::endl;
@@ -321,6 +399,7 @@ int main(int argc, char *argv[]) {
 		
 	} // File loop
 	
+	trace.close();
 	// Write total statistics.
 	std::ofstream csvfile(output_folder_name + "/stats/total.csv");
 	csvfile << total_write_bits/MEGABYTE << ", ";
