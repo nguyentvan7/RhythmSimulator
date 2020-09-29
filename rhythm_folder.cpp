@@ -32,7 +32,7 @@ bool file_sort(std::string a, std::string b) { return a.size() < b.size() || (a.
 int main(int argc, char *argv[]) {
 	// Argument handling.
 	std::string input_folder_name = "";
-	std::string output_folder_name;
+	std::string output_folder_name = "";
 	std::string region_folder_name = "";
 	std::string t;
 	int height;
@@ -64,6 +64,9 @@ int main(int argc, char *argv[]) {
 				width = atoi(argv[i]);
 				doimage = false;
 			}
+			else if (strcmp(argv[i], "--notrace") == 0 || strcmp(argv[i], "-t") == 0) {
+				dotrace = false;
+			}
 			else {
 				std::cout << "Invalid argument. Use -h or --help flag to print usage.";
 				return 0;
@@ -71,7 +74,20 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	// Checking paths.
+	// Checking args.
+	if (doimage && input_folder_name == "") {
+		std::cout << "Please provide an input folder name using the --input or -i flag";
+		return 0;
+	}
+	if (doimage && region_folder_name == "") {
+		std::cout << "Please provide a region folder name using the --region or -r flag";
+		return 0;
+	}
+	if (output_folder_name == "") {
+		std::cout << "Please provide an output folder name using the --output or -o flag";
+		return 0;
+	}
+	
 	// Check input folder.
 	if (doimage && !fs::exists(input_folder_name)) {
 		std::cout << "Input folder does not exist.";
@@ -91,7 +107,7 @@ int main(int argc, char *argv[]) {
 	if (!fs::exists(output_folder_name + "/stats")) {
 		fs::create_directory(output_folder_name + "/stats");
 	}
-	if (!fs::exists(output_folder_name + "/traces")) {
+	if (dotrace && !fs::exists(output_folder_name + "/traces")) {
 		fs::create_directory(output_folder_name + "/traces");
 	}
 	// Check region folder.
@@ -146,7 +162,9 @@ int main(int argc, char *argv[]) {
 	}
 	int channels = 3;
 	std::ofstream trace;
-	trace.open(output_folder_name + "/traces/full.txt");
+	if (dotrace) {
+		trace.open(output_folder_name + "/traces/full.txt");
+	}
 	const uint8_t PX_BITS = 24;
 	uint32_t BASE = 0x30000000;
 	const uint32_t FRAMES[4] = {BASE, BASE + height*width*PX_BITS, BASE + height*width*PX_BITS*2, BASE + height*width*PX_BITS*3};
@@ -157,6 +175,15 @@ int main(int argc, char *argv[]) {
 	const std::string WRITE = "{:#x} W\n";
 	const std::string READ = "{:#x} R\n";
 	
+	std::cout << "==============================" << std::endl;
+	std::cout << "Resolution: " << height << " x " << width << std::endl;
+	std::cout << "Image input/output " << std::boolalpha << doimage << std::endl;
+	std::cout << "Trace output: " << std::boolalpha << dotrace << std::endl;
+	std::cout << "Total images: " << filecount << std::endl;
+	std::cout << "Input folder: " << input_folder_name << std::endl;
+	std::cout << "Output folder: " << output_folder_name << std::endl;
+	std::cout << "Region folder: " << region_folder_name << std::endl;
+	std::cout << "==============================" << std::endl;
 	std::cout << "Starting processing on " << filecount << " frames." << std::endl;
 	auto start = std::chrono::high_resolution_clock::now();
 	
@@ -189,9 +216,12 @@ int main(int argc, char *argv[]) {
 		std::string line;
 		
 		// Open trace file.
-		std::string trace_path = output_folder_name + "/traces/" + region_path.substr(region_folder_name.length()+1, region_path.find(".csv")-4) + ".txt";
+		std::string trace_path;
 		std::ofstream single_trace;
-		single_trace.open(trace_path);
+		if (dotrace) {
+			trace_path = output_folder_name + "/traces/" + region_path.substr(region_folder_name.length()+1, region_path.find(".csv")-4) + ".txt";
+			single_trace.open(trace_path);
+		}
 		// Iterate over all regions.
 		while (std::getline(region_file, line)) {
 			std::stringstream ss(line);
@@ -223,9 +253,11 @@ int main(int argc, char *argv[]) {
 			std::vector<uint8_t> rowmask;
 			row_offset.push_back(write_pixel_touches);
 			write_row_offset_touches++;
-			t = fmt::format(WRITE, ROW_OFFSETS[file%4] + row*24);
-			trace << t;
-			single_trace << t;
+			if (dotrace) {
+				t = fmt::format(WRITE, ROW_OFFSETS[file%4] + row*24);
+				trace << t;
+				single_trace << t;
+			}
 			for (int col = 0; col < width/2; col++) {
 				uint8_t pixelmask = 0b11;
 				for (int reg = 0; reg < regions.size(); reg++) {
@@ -255,9 +287,11 @@ int main(int argc, char *argv[]) {
 						}
 						// 0b00 indicates regional pixel, exit loop now.
 						if (pixelmask == 0b00) {
-							t = fmt::format(WRITE, FRAMES[file%4] + (write_pixel_touches % width)*(write_pixel_touches / width)*PX_BITS);
-							trace << t;
-							single_trace << t;
+							if (dotrace) {
+								t = fmt::format(WRITE, FRAMES[file%4] + (write_pixel_touches % width)*(write_pixel_touches / width)*PX_BITS);
+								trace << t;
+								single_trace << t;
+							}
 							write_pixel_touches += 2;
 							if (doimage) {
 								encoded_pixels.push_back(input_image.at<Pixel>(row, col*2));
@@ -269,9 +303,11 @@ int main(int argc, char *argv[]) {
 				} // Region loop
 				rowmask.push_back(pixelmask);
 				write_bitmask_touches++;
-				t = fmt::format(WRITE, BITMASKS[file%4] + row*col*2);
-				trace << t;
-				single_trace << t;
+				if (dotrace) {
+					t = fmt::format(WRITE, BITMASKS[file%4] + row*col*2);
+					trace << t;
+					single_trace << t;
+				}
 			} // Col loop
 			bitmask.push_back(rowmask);
 		} // Row loop
@@ -283,9 +319,11 @@ int main(int argc, char *argv[]) {
 				encoded_pixels.push_back(zero);
 			}
 			write_pixel_touches += 2;
-			t = fmt::format(WRITE, FRAMES[file%4] + (write_pixel_touches % width)*(write_pixel_touches / width)*PX_BITS);
-			trace << t;
-			single_trace << t;
+			if (dotrace) {
+				t = fmt::format(WRITE, FRAMES[file%4] + (write_pixel_touches % width)*(write_pixel_touches / width)*PX_BITS);
+				trace << t;
+				single_trace << t;
+			}
 		}
 
 		// Convert vector to image.
@@ -311,41 +349,45 @@ int main(int argc, char *argv[]) {
 		for (int row = 0; row < height; row++) {
 			// Assume we cache row_offset for each of the frames at each row.
 			read_row_offset_touches += row_offsets.size();
-			const int b = row*24;
-			t = fmt::format(READ, ROW_OFFSETS[file%4] + b); 
-			trace << t;
-			single_trace << t;
-			t = fmt::format(READ, ROW_OFFSETS[(file+1)%4] + b); 
-			trace << t;
-			single_trace << t;
-			t = fmt::format(READ, ROW_OFFSETS[(file+2)%4] + b); 
-			trace << t;
-			single_trace << t;
-			t = fmt::format(READ, ROW_OFFSETS[(file+3)%4] + b); 
-			trace << t;
-			single_trace << t;
+			if (dotrace) {
+				const int b = row*24;
+				t = fmt::format(READ, ROW_OFFSETS[file%4] + b); 
+				trace << t;
+				single_trace << t;
+				t = fmt::format(READ, ROW_OFFSETS[(file+1)%4] + b); 
+				trace << t;
+				single_trace << t;
+				t = fmt::format(READ, ROW_OFFSETS[(file+2)%4] + b); 
+				trace << t;
+				single_trace << t;
+				t = fmt::format(READ, ROW_OFFSETS[(file+3)%4] + b); 
+				trace << t;
+				single_trace << t;
+			}
 			// Assume we cache the bitmask for the entire row for each of the 4 frames at each row.
 			read_bitmask_touches += bitmasks.size()*width/2;
-			// Need to do this 4 times so that the bitmask is read as a row in order per frame.
-			std::string b0;
-			std::string b1;
-			std::string b2;
-			std::string b3;
-			for (int col = 0; col < width/2; col++) {
-				// Do trace in here because we read the entire row.
-				b0 += fmt::format(READ, BITMASKS[file%4] + row*col*2);
-				b1 += fmt::format(READ, BITMASKS[(file+1)%4] + row*col*2);
-				b2 += fmt::format(READ, BITMASKS[(file+2)%4] + row*col*2);
-				b3 += fmt::format(READ, BITMASKS[(file+3)%4] + row*col*2);
+			if (dotrace) {
+				// Need to do this 4 times so that the bitmask is read as a row in order per frame.
+				std::string b0;
+				std::string b1;
+				std::string b2;
+				std::string b3;
+				for (int col = 0; col < width/2; col++) {
+					// Do trace in here because we read the entire row.
+					b0 += fmt::format(READ, BITMASKS[file%4] + row*col*2);
+					b1 += fmt::format(READ, BITMASKS[(file+1)%4] + row*col*2);
+					b2 += fmt::format(READ, BITMASKS[(file+2)%4] + row*col*2);
+					b3 += fmt::format(READ, BITMASKS[(file+3)%4] + row*col*2);
+				}
+				trace << b0;
+				single_trace << b0;
+				trace << b1;
+				single_trace << b1;
+				trace << b2;
+				single_trace << b2;
+				trace << b3;
+				single_trace << b3;
 			}
-			trace << b0;
-			single_trace << b0;
-			trace << b1;
-			single_trace << b1;
-			trace << b2;
-			single_trace << b2;
-			trace << b3;
-			single_trace << b3;
 			for (int col = 0; col < width/2; col++) {
 				uint8_t pixelmask = bitmask[row][col];
 				if (pixelmask == 0b01) {
@@ -360,9 +402,11 @@ int main(int argc, char *argv[]) {
 								output_image.at<Pixel>(row, col*2+1) = encoded_images[fr].at<Pixel>(r, c+1);
 							}
 							read_pixel_touches += 2;
-							t = fmt::format(READ, FRAMES[(file+fr)%4] + r*c*PX_BITS);
-							trace << t;
-							single_trace << t;
+							if (dotrace) {
+								t = fmt::format(READ, FRAMES[(file+fr)%4] + r*c*PX_BITS);
+								trace << t;
+								single_trace << t;
+							}
 							// Only want to grab pixels once.
 							break;
 						}
@@ -378,9 +422,11 @@ int main(int argc, char *argv[]) {
 						output_image.at<Pixel>(row, col*2+1) = encoded_images[0].at<Pixel>(r, c+1);
 					}
 					read_pixel_touches += 2;
-					t = fmt::format(READ, FRAMES[file%4] + r*c*PX_BITS);
-					trace << t;
-					single_trace << t;
+					if (dotrace) {
+						t = fmt::format(READ, FRAMES[file%4] + r*c*PX_BITS);
+						trace << t;
+						single_trace << t;
+					}
 				}
 				else if (doimage && pixelmask == 0b11) {
 					output_image.at<Pixel>(row, col*2) = zero;
@@ -389,7 +435,9 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		single_trace.close();
+		if (dotrace) {
+			single_trace.close();
+		}
 		// Save images.
 		std::string output_stats_name = region_path.substr(region_folder_name.length()+1, region_path.length()-region_folder_name.length()-1);
 		if (doimage) {
@@ -437,7 +485,9 @@ int main(int argc, char *argv[]) {
 		
 	} // File loop
 	
-	trace.close();
+	if (dotrace) {
+		trace.close();
+	}
 	// Write total statistics.
 	std::ofstream csvfile(output_folder_name + "/stats/total.csv");
 	csvfile << total_write_bits/MEGABYTE << ", ";
@@ -489,5 +539,6 @@ void print_usage() {
 			  << "-i, --input <INPUT_FOLDER>\t\tSpecifies the input folder, all images will be read in this folder." << std::endl
 			  << "-o, --output <OUTPUT_FOLDER>\t\tSpecifies the output folder. The folder will be created if it doesn't exist." << std::endl
 			  << "-r, --region <REGION_FOLDER>\t\tSpecifies the folder with regions for each frame in a csv." << std::endl
-			  << "-n, --nooutput <WIDTH> <HEIGHT>\t\tSpecifies there should be no image output. No input image will be required.";
+			  << "-n, --nooutput <WIDTH> <HEIGHT>\t\tSpecifies there should be no image output. No input image will be required." << std::endl
+			  << "-t, --notrace\t\t\t\tSpecifies there should be no trace output.";
 }
