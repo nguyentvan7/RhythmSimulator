@@ -154,8 +154,8 @@ int main(int argc, char *argv[]) {
 	const uint32_t BITMASKS[4] = {BASE, BASE + height*width*2, BASE + height*width*2*2, BASE + height*width*2*3};
 	BASE = 0x6A000000;
 	const uint32_t ROW_OFFSETS[4] = {BASE, BASE + height*24, BASE + height*24*2, BASE + height*24*3};
-	const std::string WRITE = "{:#x} w\n";
-	const std::string READ = "{:#x} r\n";
+	const std::string WRITE = "{:#x} W\n";
+	const std::string READ = "{:#x} R\n";
 	
 	std::cout << "Starting processing on " << filecount << " frames." << std::endl;
 	auto start = std::chrono::high_resolution_clock::now();
