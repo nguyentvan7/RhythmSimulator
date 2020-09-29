@@ -296,7 +296,9 @@ int main(int argc, char *argv[]) {
 		bitmasks.insert(bitmasks.begin(), bitmask);
 		row_offsets.insert(row_offsets.begin(), row_offset);
 		if (bitmasks.size() > 4) {
-			encoded_images.pop_back();
+			if (doimage) {
+				encoded_images.pop_back();
+			}
 			bitmasks.pop_back();
 			row_offsets.pop_back();
 		}
