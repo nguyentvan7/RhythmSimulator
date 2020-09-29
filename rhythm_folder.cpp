@@ -175,15 +175,15 @@ int main(int argc, char *argv[]) {
 	const std::string WRITE = "{:#x} W\n";
 	const std::string READ = "{:#x} R\n";
 	
-	std::cout << "==============================" << std::endl;
+	std::cout << "==================================" << std::endl;
 	std::cout << "Resolution: " << height << " x " << width << std::endl;
-	std::cout << "Image input/output " << std::boolalpha << doimage << std::endl;
+	std::cout << "Image input/output: " << std::boolalpha << doimage << std::endl;
 	std::cout << "Trace output: " << std::boolalpha << dotrace << std::endl;
 	std::cout << "Total images: " << filecount << std::endl;
 	std::cout << "Input folder: " << input_folder_name << std::endl;
 	std::cout << "Output folder: " << output_folder_name << std::endl;
 	std::cout << "Region folder: " << region_folder_name << std::endl;
-	std::cout << "==============================" << std::endl;
+	std::cout << "==================================" << std::endl;
 	std::cout << "Starting processing on " << filecount << " frames." << std::endl;
 	auto start = std::chrono::high_resolution_clock::now();
 	
