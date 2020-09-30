@@ -304,7 +304,7 @@ int main(int argc, char *argv[]) {
 				rowmask.push_back(pixelmask);
 				write_bitmask_touches++;
 				if (dotrace) {
-					t = fmt::format(WRITE, BITMASKS[file%4] + row*col*2);
+					t = fmt::format(WRITE, BITMASKS[file%4] + (row*width + col)*2);
 					trace << t;
 					single_trace << t;
 				}
@@ -373,11 +373,12 @@ int main(int argc, char *argv[]) {
 				std::string b2;
 				std::string b3;
 				for (int col = 0; col < width/2; col++) {
+					int rc = (row*width + col)*2
 					// Do trace in here because we read the entire row.
-					b0 += fmt::format(READ, BITMASKS[file%4] + row*col*2);
-					b1 += fmt::format(READ, BITMASKS[(file+1)%4] + row*col*2);
-					b2 += fmt::format(READ, BITMASKS[(file+2)%4] + row*col*2);
-					b3 += fmt::format(READ, BITMASKS[(file+3)%4] + row*col*2);
+					b0 += fmt::format(READ, BITMASKS[file%4] + rc);
+					b1 += fmt::format(READ, BITMASKS[(file+1)%4] + rc);
+					b2 += fmt::format(READ, BITMASKS[(file+2)%4] + rc);
+					b3 += fmt::format(READ, BITMASKS[(file+3)%4] + rc);
 				}
 				trace << b0;
 				single_trace << b0;
