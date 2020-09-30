@@ -373,7 +373,7 @@ int main(int argc, char *argv[]) {
 				std::string b2;
 				std::string b3;
 				for (int col = 0; col < width/2; col++) {
-					int rc = (row*width + col)*2
+					int rc = (row*width + col)*2;
 					// Do trace in here because we read the entire row.
 					b0 += fmt::format(READ, BITMASKS[file%4] + rc);
 					b1 += fmt::format(READ, BITMASKS[(file+1)%4] + rc);
