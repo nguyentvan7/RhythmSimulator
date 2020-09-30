@@ -288,7 +288,7 @@ int main(int argc, char *argv[]) {
 						// 0b00 indicates regional pixel, exit loop now.
 						if (pixelmask == 0b00) {
 							if (dotrace) {
-								t = fmt::format(WRITE, FRAMES[file%4] + (write_pixel_touches % width)*(write_pixel_touches / width)*PX_BITS);
+								t = fmt::format(WRITE, FRAMES[file%4] + ((write_pixel_touches % width)*width + (write_pixel_touches / width))*PX_BITS);
 								trace << t;
 								single_trace << t;
 							}
@@ -320,7 +320,7 @@ int main(int argc, char *argv[]) {
 			}
 			write_pixel_touches += 2;
 			if (dotrace) {
-				t = fmt::format(WRITE, FRAMES[file%4] + (write_pixel_touches % width)*(write_pixel_touches / width)*PX_BITS);
+				t = fmt::format(WRITE, FRAMES[file%4] + ((write_pixel_touches % width)*width + (write_pixel_touches / width))*PX_BITS);
 				trace << t;
 				single_trace << t;
 			}
@@ -403,7 +403,7 @@ int main(int argc, char *argv[]) {
 							}
 							read_pixel_touches += 2;
 							if (dotrace) {
-								t = fmt::format(READ, FRAMES[(file+fr)%4] + r*c*PX_BITS);
+								t = fmt::format(READ, FRAMES[(file+fr)%4] + (r*width + c)*PX_BITS);
 								trace << t;
 								single_trace << t;
 							}
@@ -423,7 +423,7 @@ int main(int argc, char *argv[]) {
 					}
 					read_pixel_touches += 2;
 					if (dotrace) {
-						t = fmt::format(READ, FRAMES[file%4] + r*c*PX_BITS);
+						t = fmt::format(READ, FRAMES[file%4] + (r*width + c)*PX_BITS);
 						trace << t;
 						single_trace << t;
 					}
