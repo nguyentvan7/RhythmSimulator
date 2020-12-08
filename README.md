@@ -27,6 +27,9 @@ Options include:
 - `-n, --nooutput <WIDTH> <HEIGHT>` to specify there should be no image output. No input image will be required in this case. `<WIDTH>` and `<HEIGHT>` describe the frame size of the intended input images.
 - `-t, --notrace` to specify there should be no trace output.
 
+### CSV Format
+(Insert blurb about CSV format here. CSV will be one per frame, each line will be one region. Each row is read as `x0, y0, x1, y1, stride, skip` with the bottom right corner being (0,0). 
+
 ### Examples  
 - No image input/output, only memory trace generation. Output will be at `examples/output`.  
 `./rhythm_folder -n 640 480 -r examples/csv -o examples/output`
