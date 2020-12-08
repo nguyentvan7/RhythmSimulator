@@ -28,7 +28,7 @@ Options include:
 - `-t, --notrace` to specify there should be no trace output.
 
 ### CSV Format
-(Insert blurb about CSV format here. CSV will be one per frame, each line will be one region. Each row is read as `x0, y0, x1, y1, stride, skip` with the bottom right corner being (0,0).)
+(Insert blurb about CSV format here. CSV will be one per frame, each line will be one region. Each row is read as `x0, y0, x1, y1, stride, skip` with the bottom left corner being (0,0).)
 
 ### Examples  
 - No image input/output, only memory trace generation. Output will be at `examples/output`.  
